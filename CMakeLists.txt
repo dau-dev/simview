@@ -19,6 +19,11 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
+# Options
+option(SIMVIEW_BUILD_TESTS "Build tests" ON)
+option(SIMVIEW_USE_HOST_ABSL "Use abseil from host" OFF)
+option(SIMVIEW_USE_HOST_GTEST "Use gtest from host" OFF)
+
 # Require out-of-source builds
 file(TO_CMAKE_PATH "${PROJECT_BINARY_DIR}/CMakeLists.txt" LOC_PATH)
 if(EXISTS "${LOC_PATH}")
@@ -38,11 +43,18 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   add_compile_options(-fcolor-diagnostics)
 endif()
 
-# Helper macros are defined in a separate file.
-include(macros.cmake)
+if(SIMVIEW_BUILD_TESTS)
+  # Testing is good!
+  enable_testing()
 
-# Testing is good!
-enable_testing()
+  macro(simview_add_test Name)
+    if(SIMVIEW_BUILD_TESTS)
+      add_executable(${Name} ${ARGN})
+      target_link_libraries(${Name} PRIVATE gtest_main)
+      add_test(NAME ${Name} COMMAND ${Name})
+    endif()
+  endmacro()
+endif()
 
 # All include is relative to project root, or local dir.
 include_directories(${PROJECT_SOURCE_DIR})

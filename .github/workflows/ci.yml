@@ -14,29 +14,32 @@ jobs:
     steps:
 
     - name: Cancel previous
-      uses: styfle/cancel-workflow-action@0.9.1
+      uses: styfle/cancel-workflow-action@0.11.0
       with:
         access_token: ${{ github.token }}
 
     - name: Install build dependencies for simview and surelog
       run: |
         sudo apt-get update -qq
-        sudo apt install -y libunwind-dev
         sudo apt install -y \
-          build-essential cmake ninja-build \
-          g++ default-jre \
+          libunwind-dev \
+          build-essential \
+          cmake \
+          ninja-build \
+          g++ \
+          default-jre \
           google-perftools \
           python3 python3-dev python3-orderedmultidict python3-psutil \
           libgoogle-perftools-dev \
           uuid-dev
 
     - name: Checkout simview
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Use ccache
-      uses: hendrikmuhs/ccache-action@v1
+      uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: build-cache
 
@@ -51,7 +54,7 @@ jobs:
 
     - name: Build Surelog
       run: |
-        git clone --recursive https://github.com/chipsalliance/Surelog.git
+        git clone --recursive --branch v1.75 https://github.com/chipsalliance/Surelog.git
         (cd Surelog ; make install)
 
     - name: Build
@@ -63,12 +66,76 @@ jobs:
       run: |
         ninja -C build test
 
+  linux-build-nonvendored:
+    name: Build and Test (No Vendored Dependencies)
+
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Install build dependencies for simview and surelog
+      run: |
+        sudo apt-get update -qq
+        sudo apt install -y libunwind-dev
+        sudo apt install -y \
+          libunwind-dev \
+          build-essential \
+          cmake \
+          ninja-build \
+          g++ \
+          default-jre \
+          google-perftools \
+          python3 python3-dev python3-orderedmultidict python3-psutil \
+          libgoogle-perftools-dev \
+          uuid-dev
+
+    - name: Checkout simview
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Use ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: build-cache
+
+    - name: Configure shell
+      run: |
+        echo 'PATH=/usr/lib/ccache:'"$PATH" >> $GITHUB_ENV
+        echo 'PREFIX=${GITHUB_WORKSPACE}/surelog-install' >> $GITHUB_ENV
+
+    - name: Show shell configuration
+      run: |
+        env
+
+    - name: Install Abseil and GTest
+      run: |
+        git clone --depth 1 https://github.com/google/googletest.git
+        cd googletest && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_POSITION_INDEPENDENT_CODE=ON . && cmake --build build && sudo cmake --install build
+
+        git clone --depth 1 --branch 20230802.1 https://github.com/abseil/abseil-cpp.git
+        pushd abseil-cpp && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_POSITION_INDEPENDENT_CODE=ON . && cmake --build build && sudo cmake --install build
+
+    - name: Build Surelog
+      run: |
+        git clone --recursive https://github.com/chipsalliance/Surelog.git
+        (cd Surelog ; make install)
+
+    - name: Build
+      run: |
+        cmake -B build -GNinja -DCMAKE_PREFIX_PATH=${GITHUB_WORKSPACE}/surelog-install -DCMAKE_CXX_FLAGS="-Wall -W -Wextra -Werror" -DSIMVIEW_USE_HOST_GTEST=ON -DSIMVIEW_USE_HOST_ABSL=ON  .
+        ninja -C build
+
+    - name: Test
+      run: |
+        ninja -C build test
+
+
   CodeFormatting:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
